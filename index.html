@@ -1,0 +1,566 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>파스텔 힐링 테트리스 (Pastel Healing Tetris)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Gowun+Dodum&family=Fredoka:wght@400;600;700&family=Noto+Sans+KR:wght@400;600;700&display=swap" rel="stylesheet">
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        gowun: ['Gowun Dodum', 'sans-serif'],
+                        fredoka: ['Fredoka', 'cursive'],
+                        sans: ['Noto Sans KR', 'sans-serif']
+                    },
+                    keyframes: {
+                        bounceSoft: {
+                            '0%, 100%': { transform: 'translateY(0) scale(1)' },
+                            '50%': { transform: 'translateY(-6px) scale(1.03)' }
+                        },
+                        popIn: {
+                            '0%': { transform: 'scale(0.8)', opacity: '0' },
+                            '100%': { transform: 'scale(1)', opacity: '1' }
+                        }
+                    },
+                    animation: {
+                        'bounce-soft': 'bounceSoft 2s infinite ease-in-out',
+                        'pop-in': 'popIn 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards'
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        * { user-select:none; -webkit-user-select:none; -webkit-touch-callout:none; touch-action:manipulation; }
+        body { font-family:'Noto Sans KR','Gowun Dodum',sans-serif; transition:background-color .5s ease,color .5s ease; overflow-x:hidden; }
+        ::-webkit-scrollbar { width:6px; }
+        ::-webkit-scrollbar-track { background:transparent; }
+        ::-webkit-scrollbar-thumb { background:rgba(0,0,0,.15); border-radius:10px; }
+
+        .theme-cotton {
+            --bg-main:#FFF0F5; --bg-card:rgba(255,255,255,.85); --bg-board:#FFF9FC;
+            --grid-line:#F3E5F5; --text-main:#5D4037; --accent:#FFB7B2;
+            --card-shadow:0 10px 25px -5px rgba(255,183,178,.3);
+        }
+        .theme-matcha {
+            --bg-main:#F1F8E9; --bg-card:rgba(255,255,255,.88); --bg-board:#F9FBE7;
+            --grid-line:#DCEDC8; --text-main:#2E4600; --accent:#AED581;
+            --card-shadow:0 10px 25px -5px rgba(174,213,129,.3);
+        }
+        .theme-peach {
+            --bg-main:#FFF3E0; --bg-card:rgba(255,255,255,.88); --bg-board:#FFF8E1;
+            --grid-line:#FFE0B2; --text-main:#4A2700; --accent:#FFCC80;
+            --card-shadow:0 10px 25px -5px rgba(255,204,128,.35);
+        }
+        .theme-night {
+            --bg-main:#1A1C29; --bg-card:rgba(30,34,53,.85); --bg-board:#121420;
+            --grid-line:#2A2E45; --text-main:#E2E8F0; --accent:#93C5FD;
+            --card-shadow:0 10px 25px -5px rgba(147,197,253,.15);
+        }
+
+        .theme-bg { background-color:var(--bg-main); color:var(--text-main); }
+        .card-style {
+            background-color:var(--bg-card); backdrop-filter:blur(10px); box-shadow:var(--card-shadow);
+            border:2px solid rgba(255,255,255,.6);
+        }
+        .theme-night .card-style { border:2px solid rgba(255,255,255,.08); }
+        .btn-pastel { transition:all .15s cubic-bezier(.4,0,.2,1); box-shadow:0 4px 12px rgba(0,0,0,.06); }
+        .btn-pastel:active { transform:scale(.92); }
+        #gameCanvas { background-color:var(--bg-board); border-radius:16px; box-shadow:inset 0 2px 8px rgba(0,0,0,.04); }
+
+        /* Mobile one-screen layout */
+        @media (max-width: 767px) {
+            html, body {
+                width:100%;
+                height:100%;
+                min-height:100dvh;
+                overflow:hidden;
+            }
+
+            body {
+                padding:4px 4px 122px 4px !important;
+                justify-content:flex-start !important;
+                box-sizing:border-box;
+            }
+
+            header {
+                flex-shrink:0; min-height:42px; padding:4px 8px !important;
+                margin-bottom:4px !important; border-radius:12px !important;
+            }
+            header h1 { font-size:15px !important; line-height:1.1; }
+            header h1 #modeBadge { font-size:9px !important; padding:2px 5px !important; }
+            header .text-2xl, header .text-3xl { font-size:20px !important; }
+            #btnSound, #btnBgm, #btnTheme, #btnHelp { padding:6px !important; border-radius:9px !important; }
+
+            main {
+                flex:1 !important;
+                min-height:0;
+                margin:0 !important;
+                gap:4px !important;
+                justify-content:flex-start !important;
+                align-items:center !important;
+                overflow:hidden;
+            }
+
+            .mobile-hold-panel { display:none !important; }
+            .mobile-left-panel { width:100% !important; height:auto; display:block !important; }
+            .mobile-stats {
+                width:100%; height:38px; padding:3px 10px !important; border-radius:11px !important;
+                display:flex !important; flex-direction:row !important; justify-content:space-around !important;
+                align-items:center !important; gap:8px !important;
+            }
+            .mobile-stats > div { flex:1; min-width:0; }
+            .mobile-stats #scoreText { font-size:15px !important; line-height:1; }
+            .mobile-stats #highScoreText { font-size:11px !important; line-height:1; }
+            .mobile-stats .text-\[10px\] { font-size:8px !important; }
+            .mobile-stats > div:last-child {
+                padding-top:0 !important; border-top:0 !important; display:flex !important;
+                flex-direction:row !important; justify-content:space-around !important; gap:4px !important;
+            }
+
+            .game-shell {
+                padding:4px !important;
+                border-radius:16px !important;
+                flex:1 1 auto;
+                min-height:0;
+                max-height:none;
+                overflow:hidden;
+            }
+
+            .game-shell > .relative.overflow-hidden {
+                flex:1 1 auto;
+                min-height:0;
+                display:flex;
+                align-items:center;
+                justify-content:center;
+            }
+
+            #gameCanvas {
+                height:min(calc(100dvh - 206px), calc((100vw - 18px) * 2)) !important;
+                width:calc(min(calc(100dvh - 206px), calc((100vw - 18px) * 2)) / 2) !important;
+                max-width:calc(100vw - 18px);
+                max-height:none;
+                aspect-ratio:1/2;
+                border-radius:10px !important;
+                display:block;
+            }
+            #mascotBox { display:none !important; }
+            #btnUndo, #btnPause {
+                min-height:26px; padding-top:4px !important; padding-bottom:4px !important; font-size:10px !important;
+            }
+            .mobile-right-panel { display:none !important; }
+
+            #overlay { padding:6px !important; }
+            #overlayContent {
+                max-width:215px !important; padding:12px !important; gap:5px !important; border-radius:18px !important;
+            }
+            #overlayContent .text-4xl { font-size:25px !important; }
+            #overlayTitle { font-size:16px !important; }
+            #overlaySub { font-size:10px !important; }
+            #btnSelectClassic, #btnSelectRelax { padding:7px 9px !important; font-size:10px !important; }
+            #btnStart { padding:8px !important; font-size:11px !important; border-radius:12px !important; }
+
+            .mobile-controls {
+                position:fixed;
+                left:4px;
+                right:4px;
+                bottom:max(4px, env(safe-area-inset-bottom));
+                width:auto;
+                max-width:none !important;
+                margin:0 !important;
+                z-index:100;
+            }
+
+            .mobile-controls > div {
+                padding:5px !important;
+                gap:4px !important;
+                border-radius:13px !important;
+                box-shadow:0 8px 24px rgba(0,0,0,.12);
+            }
+            .mobile-controls .flex, .mobile-controls .grid { gap:4px !important; }
+            #touchHold, #touchRotate, #touchHardDrop {
+                min-height:36px; padding:7px 5px !important; font-size:10px !important;
+            }
+            #touchLeft, #touchSoftDrop, #touchRight {
+                min-height:39px; padding:7px !important; font-size:15px !important;
+            }
+        }
+
+        @media (max-width:767px) and (max-height:680px) {
+            body { padding-bottom:104px !important; }
+            #gameCanvas {
+                height:min(calc(100dvh - 184px), calc((100vw - 18px) * 2)) !important;
+                width:calc(min(calc(100dvh - 184px), calc((100vw - 18px) * 2)) / 2) !important;
+            }
+            .mobile-stats { height:30px; }
+            #touchHold, #touchRotate, #touchHardDrop { min-height:32px; padding:5px !important; }
+            #touchLeft, #touchSoftDrop, #touchRight { min-height:34px; padding:5px !important; }
+        }
+
+        @media (max-width:767px) and (max-height:600px) {
+            header { min-height:32px; }
+            .mobile-stats { height:27px; }
+            #gameCanvas {
+                height:min(calc(100dvh - 166px), calc((100vw - 18px) * 2)) !important;
+                width:calc(min(calc(100dvh - 166px), calc((100vw - 18px) * 2)) / 2) !important;
+            }
+            #touchHold, #touchRotate, #touchHardDrop { min-height:28px; padding:3px !important; }
+            #touchLeft, #touchSoftDrop, #touchRight { min-height:30px; padding:3px !important; }
+        }
+
+    </style>
+</head>
+
+<body class="theme-cotton theme-bg min-h-screen flex flex-col items-center justify-between p-2 sm:p-4 select-none">
+
+<header class="w-full max-w-4xl flex items-center justify-between py-2 px-3 sm:px-6 rounded-2xl card-style mb-3">
+    <div class="flex items-center space-x-2">
+        <span class="text-2xl sm:text-3xl animate-bounce-soft">☁️</span>
+        <div>
+            <h1 class="text-xl sm:text-2xl font-bold font-fredoka tracking-wide flex items-center gap-2">
+                Pastel Tetris
+                <span id="modeBadge" class="text-xs px-2 py-0.5 rounded-full bg-pink-100 text-pink-600 font-normal">클래식</span>
+            </h1>
+            <p class="text-xs opacity-75 font-gowun hidden sm:block">말랑말랑 파스텔 힐링 퍼즐</p>
+        </div>
+    </div>
+    <div class="flex items-center space-x-1 sm:space-x-2">
+        <button id="btnSound" class="btn-pastel p-2 sm:px-3 sm:py-1.5 rounded-xl bg-white/70 hover:bg-white text-sm"><i class="fa-solid fa-volume-high text-pink-400"></i></button>
+        <button id="btnBgm" class="btn-pastel p-2 sm:px-3 sm:py-1.5 rounded-xl bg-white/70 hover:bg-white text-sm"><i class="fa-solid fa-music text-purple-400"></i></button>
+        <button id="btnTheme" class="btn-pastel p-2 sm:px-3 sm:py-1.5 rounded-xl bg-white/70 hover:bg-white text-sm"><i class="fa-solid fa-palette text-amber-400"></i></button>
+        <button id="btnHelp" class="btn-pastel p-2 rounded-xl bg-white/70 hover:bg-white text-sm"><i class="fa-solid fa-circle-question text-blue-400"></i></button>
+    </div>
+</header>
+
+<main class="w-full max-w-4xl flex-1 flex flex-col md:flex-row items-center md:items-start justify-center gap-3 sm:gap-5 my-auto">
+
+    <div class="mobile-left-panel flex md:flex-col justify-between w-full md:w-36 gap-2">
+        <div class="mobile-hold-panel card-style p-3 rounded-2xl flex-1 md:flex-none flex flex-col items-center justify-center text-center">
+            <span class="text-xs font-bold opacity-70 mb-1"><i class="fa-solid fa-hand"></i> HOLD</span>
+            <div class="w-16 h-16 sm:w-20 sm:h-20 flex items-center justify-center bg-white/40 rounded-xl">
+                <canvas id="holdCanvas" width="80" height="80"></canvas>
+            </div>
+            <button id="btnHold" class="mt-2 w-full text-xs py-1 px-2 rounded-lg bg-pink-200/80 hover:bg-pink-300 font-semibold">홀드 (C)</button>
+        </div>
+
+        <div class="mobile-stats card-style p-3 rounded-2xl flex-1 md:flex-none flex flex-col justify-around gap-1 sm:gap-2 text-center">
+            <div>
+                <div class="text-[10px] sm:text-xs opacity-70 font-semibold">점수</div>
+                <div id="scoreText" class="text-base sm:text-xl font-bold font-fredoka text-pink-500">0</div>
+            </div>
+            <div>
+                <div class="text-[10px] sm:text-xs opacity-70 font-semibold">최고 기록</div>
+                <div id="highScoreText" class="text-xs sm:text-sm font-semibold opacity-80">0</div>
+            </div>
+            <div class="flex justify-around md:flex-col md:gap-1 pt-1 border-t border-black/5">
+                <div><span class="text-[10px] opacity-70">레벨 </span><span id="levelText" class="text-xs font-bold">1</span></div>
+                <div><span class="text-[10px] opacity-70">줄 </span><span id="linesText" class="text-xs font-bold">0</span></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="game-shell relative card-style p-2 sm:p-3 rounded-3xl flex flex-col items-center shadow-2xl">
+        <div id="mascotBox" class="absolute -top-12 left-4 sm:-left-12 card-style px-3 py-1.5 rounded-2xl flex items-center gap-2 animate-bounce-soft z-20">
+            <span id="mascotEmoji" class="text-xl sm:text-2xl">☁️</span>
+            <span id="mascotMessage" class="text-xs font-medium font-gowun">즐겁게 해봐요!</span>
+        </div>
+
+        <div class="relative overflow-hidden rounded-2xl">
+            <canvas id="gameCanvas" width="280" height="560" class="w-[240px] h-[480px] sm:w-[280px] sm:h-[560px] block"></canvas>
+
+            <div id="toastMessage" class="absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 opacity-0 transition-all duration-300 pointer-events-none text-center z-30">
+                <div id="toastText" class="text-2xl font-bold text-white px-4 py-2 rounded-2xl bg-pink-400/90">EXCELLENT!</div>
+            </div>
+
+            <div id="overlay" class="absolute inset-0 bg-black/40 backdrop-blur-sm flex flex-col items-center justify-center p-4 text-center z-40">
+                <div id="overlayContent" class="bg-white/95 rounded-3xl p-6 shadow-2xl max-w-xs w-full flex flex-col items-center gap-3 animate-pop-in text-gray-800">
+                    <div class="text-4xl">☁️</div>
+                    <h2 id="overlayTitle" class="text-xl font-bold">파스텔 테트리스</h2>
+                    <p id="overlaySub" class="text-xs text-gray-600">마음이 편안해지는 블록 게임</p>
+                    <div class="w-full space-y-2 my-1">
+                        <button id="btnSelectClassic" class="w-full py-2.5 px-4 rounded-xl bg-pink-100 hover:bg-pink-200 text-pink-800 text-xs font-bold">
+                            <i class="fa-solid fa-trophy mr-1.5"></i>클래식 모드
+                        </button>
+                        <button id="btnSelectRelax" class="w-full py-2.5 px-4 rounded-xl bg-teal-100 hover:bg-teal-200 text-teal-800 text-xs font-bold">
+                            <i class="fa-solid fa-heart mr-1.5"></i>힐링/무제한 모드
+                        </button>
+                    </div>
+                    <button id="btnStart" class="w-full py-3 rounded-2xl bg-pink-400 hover:bg-pink-500 text-white font-bold text-sm">게임 시작하기</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="w-full flex items-center justify-between mt-2 px-1 gap-2">
+            <button id="btnUndo" class="btn-pastel flex-1 py-1.5 rounded-xl bg-teal-100 text-teal-800 text-xs font-bold disabled:opacity-40" disabled>
+                <i class="fa-solid fa-rotate-left"></i> 되돌리기
+            </button>
+            <button id="btnPause" class="btn-pastel px-3 py-1.5 rounded-xl bg-gray-100 text-gray-700 text-xs font-bold">
+                <i class="fa-solid fa-pause"></i>
+            </button>
+        </div>
+    </div>
+
+    <div class="mobile-right-panel flex md:flex-col justify-between w-full md:w-36 gap-2">
+        <div class="card-style p-3 rounded-2xl flex-1 md:flex-none flex flex-col items-center">
+            <span class="text-xs font-bold opacity-70 mb-1"><i class="fa-solid fa-forward"></i> NEXT</span>
+            <canvas id="nextCanvas1" width="60" height="60"></canvas>
+            <canvas id="nextCanvas2" width="50" height="50"></canvas>
+        </div>
+    </div>
+</main>
+
+<footer class="mobile-controls w-full max-w-lg mt-2 md:hidden">
+    <div class="card-style p-2 rounded-2xl flex flex-col gap-2">
+        <div class="flex justify-between items-center gap-2">
+            <button id="touchHold" class="btn-pastel flex-1 py-3 rounded-xl bg-pink-100 text-pink-800 text-xs font-bold"><i class="fa-solid fa-hand"></i> HOLD</button>
+            <button id="touchRotate" class="btn-pastel flex-1 py-3 rounded-xl bg-purple-100 text-purple-800 text-xs font-bold"><i class="fa-solid fa-rotate-right"></i> 회전</button>
+            <button id="touchHardDrop" class="btn-pastel flex-1 py-3 rounded-xl bg-blue-100 text-blue-800 text-xs font-bold"><i class="fa-solid fa-angles-down"></i> DROP</button>
+        </div>
+        <div class="grid grid-cols-3 gap-2">
+            <button id="touchLeft" class="btn-pastel py-3 rounded-xl bg-white/80 text-gray-700 font-bold"><i class="fa-solid fa-arrow-left"></i></button>
+            <button id="touchSoftDrop" class="btn-pastel py-3 rounded-xl bg-white/80 text-gray-700 font-bold"><i class="fa-solid fa-arrow-down"></i></button>
+            <button id="touchRight" class="btn-pastel py-3 rounded-xl bg-white/80 text-gray-700 font-bold"><i class="fa-solid fa-arrow-right"></i></button>
+        </div>
+    </div>
+</footer>
+
+<div id="helpModal" class="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-white rounded-3xl p-6 max-w-sm w-full space-y-4 text-gray-800 shadow-2xl">
+        <div class="flex justify-between"><h3 class="font-bold text-lg text-pink-500">☁️ 게임 방법</h3><button id="btnCloseHelp">&times;</button></div>
+        <div class="text-xs">블록을 움직여 가로줄을 완성하세요. HOLD, 회전, DROP 버튼으로 모바일에서도 조작할 수 있습니다.</div>
+        <button id="btnConfirmHelp" class="w-full py-2.5 bg-pink-400 text-white rounded-xl font-bold text-xs">알겠어요!</button>
+    </div>
+</div>
+
+<script>
+class SoundEngine {
+    constructor(){ this.ctx=null; this.soundEnabled=true; this.bgmEnabled=false; this.bgmInterval=null; this.bgmStep=0; this.bgmSubStep=0; }
+    init(){ if(!this.ctx){ const A=window.AudioContext||window.webkitAudioContext; this.ctx=new A(); } if(this.ctx.state==='suspended') this.ctx.resume(); }
+    playNote(freq,duration=.1,type='sine',gainVal=.12){
+        if(!this.soundEnabled||!this.ctx)return;
+        const osc=this.ctx.createOscillator(), gain=this.ctx.createGain();
+        osc.type=type; osc.frequency.value=freq;
+        gain.gain.setValueAtTime(gainVal,this.ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(.001,this.ctx.currentTime+duration);
+        osc.connect(gain); gain.connect(this.ctx.destination); osc.start(); osc.stop(this.ctx.currentTime+duration);
+    }
+    playMove(){this.playNote(420,.05,'triangle',.06)}
+    playRotate(){this.playNote(650,.08,'sine',.1)}
+    playDrop(h=false){this.playNote(h?220:300,h?.15:.06,h?'triangle':'sine',h?.2:.06)}
+    playLineClear(){this.playNote(660,.2,'sine',.15);setTimeout(()=>this.playNote(880,.2,'sine',.15),80)}
+    playGameOver(){[400,350,300,250].forEach((f,i)=>setTimeout(()=>this.playNote(f,.2,'sawtooth',.08),i*100))}
+    toggleBgm(){
+        this.init();
+        this.bgmEnabled=!this.bgmEnabled;
+
+        if(this.bgmEnabled){
+            // Upbeat original synth-pop loop (no external audio file)
+            const lead = [
+                659.25, 783.99, 880.00, 783.99,
+                659.25, 587.33, 659.25, 783.99,
+                880.00, 1046.50, 880.00, 783.99,
+                659.25, 587.33, 523.25, 587.33
+            ];
+            const bass = [
+                130.81,130.81,146.83,146.83,
+                164.81,164.81,146.83,146.83,
+                130.81,130.81,174.61,174.61,
+                164.81,164.81,146.83,146.83
+            ];
+
+            this.bgmStep=0;
+            this.bgmInterval=setInterval(()=>{
+                if(!this.bgmEnabled || !this.soundEnabled) return;
+
+                const i=this.bgmStep % lead.length;
+                const lf=lead[i];
+                const bf=bass[i];
+
+                // Bright lead
+                this.playNote(lf, .11, 'square', .025);
+
+                // Soft rhythmic bass every other step
+                if(i % 2 === 0){
+                    this.playNote(bf, .16, 'triangle', .038);
+                }
+
+                // Sparkle accent on beat
+                if(i % 4 === 2){
+                    this.playNote(lf * 2, .06, 'sine', .016);
+                }
+
+                this.bgmStep++;
+            }, 145);
+        } else {
+            clearInterval(this.bgmInterval);
+            this.bgmInterval=null;
+        }
+        return this.bgmEnabled;
+    }
+}
+const audio=new SoundEngine();
+
+const COLS=10, ROWS=20, BLOCK_SIZE=28;
+const THEMES={
+ cotton:{name:'솜사탕',boardBg:'#FFF9FC',gridLine:'rgba(220,190,225,.7)',blocks:[null,'#FF6B81','#FF9F43','#10AC84','#FECA57','#54A0FF','#9B59B6','#EE5253']},
+ matcha:{name:'말차 라떼',boardBg:'#F9FBE7',gridLine:'rgba(190,215,160,.7)',blocks:[null,'#7CB342','#C0CA33','#FBC02D','#43A047','#00897B','#FFB300','#8E24AA']},
+ peach:{name:'복숭아 크림',boardBg:'#FFF8E1',gridLine:'rgba(230,195,145,.7)',blocks:[null,'#FF8A65','#FF7043','#FDD835','#EC407A','#FB8C00','#81C784','#26A69A']},
+ night:{name:'심야의 야경',boardBg:'#121420',gridLine:'rgba(60,65,95,.8)',blocks:[null,'#60A5FA','#F472B6','#FACC15','#34D399','#A855F7','#FB923C','#F87171']}
+};
+let currentThemeKey='cotton';
+const SHAPES=[[],[[0,0,0,0],[1,1,1,1],[0,0,0,0],[0,0,0,0]],[[2,0,0],[2,2,2],[0,0,0]],[[0,0,3],[3,3,3],[0,0,0]],[[4,4],[4,4]],[[0,5,5],[5,5,0],[0,0,0]],[[0,6,0],[6,6,6],[0,0,0]],[[7,7,0],[0,7,7],[0,0,0]]];
+
+class Game{
+ constructor(){
+  this.canvas=document.getElementById('gameCanvas'); this.ctx=this.canvas.getContext('2d');
+  this.holdCanvas=document.getElementById('holdCanvas'); this.holdCtx=this.holdCanvas.getContext('2d');
+  this.nextCanvas1=document.getElementById('nextCanvas1'); this.nextCtx1=this.nextCanvas1.getContext('2d');
+  this.nextCanvas2=document.getElementById('nextCanvas2'); this.nextCtx2=this.nextCanvas2.getContext('2d');
+  this.highScore=parseInt(localStorage.getItem('pastel_tetris_highscore')||'0',10);
+  document.getElementById('highScoreText').innerText=this.highScore.toLocaleString();
+  this.reset();
+ }
+ reset(){
+  this.grid=Array.from({length:ROWS},()=>Array(COLS).fill(0)); this.score=0; this.lines=0; this.level=1;
+  this.currentPiece=null; this.holdPiece=null; this.canHold=true; this.nextQueue=[];
+  this.isGameOver=false; this.isPaused=false; this.isRunning=false; this.dropCounter=0; this.dropInterval=1000; this.lastTime=0;
+ }
+ fillNextQueue(){while(this.nextQueue.length<3)this.nextQueue.push(Math.floor(Math.random()*7)+1)}
+ spawnPiece(){
+  this.fillNextQueue(); const s=this.nextQueue.shift();
+  this.currentPiece={shapeIndex:s,matrix:SHAPES[s],x:Math.floor(COLS/2)-Math.ceil(SHAPES[s][0].length/2),y:0};
+  this.canHold=true; if(this.collide(this.currentPiece))this.gameOver();
+ }
+ collide(piece){
+  for(let r=0;r<piece.matrix.length;r++)for(let c=0;c<piece.matrix[r].length;c++)if(piece.matrix[r][c]){
+   const x=piece.x+c,y=piece.y+r;
+   if(x<0||x>=COLS||y>=ROWS)return true;
+   if(y>=0&&this.grid[y][x])return true;
+  } return false;
+ }
+ start(){
+  this.reset(); this.isRunning=true; this.fillNextQueue(); this.spawnPiece(); this.updateUI();
+  document.getElementById('overlay').classList.add('hidden'); audio.init();
+  this.lastTime=performance.now(); requestAnimationFrame(this.update.bind(this));
+ }
+ move(dx){if(!this.isRunning||this.isPaused)return;this.currentPiece.x+=dx;if(this.collide(this.currentPiece))this.currentPiece.x-=dx;else audio.playMove();this.draw()}
+ rotate(){
+  if(!this.isRunning||this.isPaused)return;
+  const old=this.currentPiece.matrix, pos=this.currentPiece.x;
+  const rot=old.map((_,i)=>old.map(row=>row[i])).map(row=>row.reverse());
+  this.currentPiece.matrix=rot; let off=1;
+  while(this.collide(this.currentPiece)){this.currentPiece.x+=off;off=-(off+(off>0?1:-1));if(Math.abs(off)>old[0].length){this.currentPiece.matrix=old;this.currentPiece.x=pos;return}}
+  audio.playRotate();this.draw();
+ }
+ softDrop(){
+  if(!this.isRunning||this.isPaused)return;
+  this.currentPiece.y++;
+  if(this.collide(this.currentPiece)){this.currentPiece.y--;this.lock()}else{this.score++;this.updateUI();}
+  this.dropCounter=0; this.draw();
+ }
+ hardDrop(){
+  if(!this.isRunning||this.isPaused)return; let d=0;
+  while(!this.collide(this.currentPiece)){this.currentPiece.y++;d++}
+  this.currentPiece.y--; this.score+=d*2; audio.playDrop(true); this.lock(); this.draw();
+ }
+ hold(){
+  if(!this.isRunning||this.isPaused||!this.canHold)return;
+  const cur=this.currentPiece.shapeIndex;
+  if(this.holdPiece==null){this.holdPiece=cur;this.spawnPiece()}
+  else{const t=this.holdPiece;this.holdPiece=cur;this.currentPiece={shapeIndex:t,matrix:SHAPES[t],x:Math.floor(COLS/2)-Math.ceil(SHAPES[t][0].length/2),y:0}}
+  this.canHold=false;this.draw();
+ }
+ lock(){
+  const p=this.currentPiece;
+  for(let r=0;r<p.matrix.length;r++)for(let c=0;c<p.matrix[r].length;c++)if(p.matrix[r][c]){
+   const y=p.y+r,x=p.x+c;if(y>=0)this.grid[y][x]=p.shapeIndex;
+  }
+  let n=0;
+  for(let r=ROWS-1;r>=0;r--){if(this.grid[r].every(Boolean)){this.grid.splice(r,1);this.grid.unshift(Array(COLS).fill(0));n++;r++}}
+  if(n){this.lines+=n;this.score+=[0,100,300,500,800][n]*this.level;this.level=Math.floor(this.lines/10)+1;this.dropInterval=Math.max(100,1000-(this.level-1)*80);audio.playLineClear()}
+  this.updateUI();this.spawnPiece();
+ }
+ gameOver(){
+  this.isGameOver=true;this.isRunning=false;audio.playGameOver();
+  document.getElementById('overlayTitle').innerText='게임 오버';
+  document.getElementById('overlaySub').innerText=`최종 점수: ${this.score.toLocaleString()}점`;
+  document.getElementById('btnStart').innerText='다시 도전하기';
+  document.getElementById('overlay').classList.remove('hidden');
+ }
+ togglePause(){
+  if(!this.isRunning||this.isGameOver)return;
+  this.isPaused=!this.isPaused;
+  if(this.isPaused){document.getElementById('overlayTitle').innerText='일시 정지';document.getElementById('overlaySub').innerText='잠시 쉬어가는 중';document.getElementById('btnStart').innerText='계속하기';document.getElementById('overlay').classList.remove('hidden')}
+  else{document.getElementById('overlay').classList.add('hidden');this.lastTime=performance.now();requestAnimationFrame(this.update.bind(this))}
+ }
+ updateUI(){
+  scoreText.innerText=this.score.toLocaleString();levelText.innerText=this.level;linesText.innerText=this.lines;
+  if(this.score>this.highScore){this.highScore=this.score;localStorage.setItem('pastel_tetris_highscore',this.highScore);highScoreText.innerText=this.highScore.toLocaleString()}
+ }
+ ghost(){
+  if(!this.currentPiece)return null;const g={...this.currentPiece,y:this.currentPiece.y};
+  while(!this.collide(g))g.y++;g.y--;return g;
+ }
+ update(t=0){
+  if(!this.isRunning||this.isPaused)return;
+  const dt=t-this.lastTime;this.lastTime=t;this.dropCounter+=dt;
+  if(this.dropCounter>this.dropInterval)this.softDrop();
+  this.draw();requestAnimationFrame(this.update.bind(this));
+ }
+ drawBlock(ctx,x,y,color,size=BLOCK_SIZE){
+  const px=x*size,py=y*size;ctx.fillStyle=color;ctx.beginPath();ctx.roundRect(px+2,py+2,size-4,size-4,6);ctx.fill();
+  ctx.fillStyle='rgba(255,255,255,.35)';ctx.beginPath();ctx.roundRect(px+4,py+4,size-8,(size-8)*.3,4);ctx.fill();
+ }
+ draw(){
+  const th=THEMES[currentThemeKey];this.ctx.fillStyle=th.boardBg;this.ctx.fillRect(0,0,280,560);
+  this.ctx.strokeStyle=th.gridLine;
+  for(let r=0;r<ROWS;r++)for(let c=0;c<COLS;c++){this.ctx.strokeRect(c*BLOCK_SIZE,r*BLOCK_SIZE,BLOCK_SIZE,BLOCK_SIZE);if(this.grid[r][c])this.drawBlock(this.ctx,c,r,th.blocks[this.grid[r][c]])}
+  const g=this.ghost(); if(g){this.ctx.globalAlpha=.25;for(let r=0;r<g.matrix.length;r++)for(let c=0;c<g.matrix[r].length;c++)if(g.matrix[r][c])this.drawBlock(this.ctx,g.x+c,g.y+r,th.blocks[g.shapeIndex]);this.ctx.globalAlpha=1}
+  if(this.currentPiece){const p=this.currentPiece;for(let r=0;r<p.matrix.length;r++)for(let c=0;c<p.matrix[r].length;c++)if(p.matrix[r][c])this.drawBlock(this.ctx,p.x+c,p.y+r,th.blocks[p.shapeIndex])}
+  this.drawPreviews();
+ }
+ mini(ctx,shapeIndex,w,h){
+  const th=THEMES[currentThemeKey];ctx.fillStyle=th.boardBg;ctx.fillRect(0,0,w,h);if(!shapeIndex)return;
+  const m=SHAPES[shapeIndex],s=14,ox=(w-m[0].length*s)/2,oy=(h-m.length*s)/2;
+  for(let r=0;r<m.length;r++)for(let c=0;c<m[r].length;c++)if(m[r][c]){ctx.fillStyle=th.blocks[shapeIndex];ctx.beginPath();ctx.roundRect(ox+c*s+1,oy+r*s+1,s-2,s-2,3);ctx.fill()}
+ }
+ drawPreviews(){this.mini(this.holdCtx,this.holdPiece,80,80);this.mini(this.nextCtx1,this.nextQueue[0],60,60);this.mini(this.nextCtx2,this.nextQueue[1],50,50)}
+}
+const game=new Game();
+
+window.onload=()=>{
+ game.draw();
+ btnStart.onclick=()=>game.isPaused?game.togglePause():game.start();
+ btnPause.onclick=()=>game.togglePause();
+ btnHold.onclick=()=>game.hold();
+ btnUndo.onclick=()=>{};
+ btnSelectClassic.onclick=()=>{modeBadge.innerText='클래식'};
+ btnSelectRelax.onclick=()=>{modeBadge.innerText='힐링'};
+ btnTheme.onclick=()=>{const ks=['cotton','matcha','peach','night'];currentThemeKey=ks[(ks.indexOf(currentThemeKey)+1)%ks.length];document.body.className=`theme-${currentThemeKey} theme-bg min-h-screen flex flex-col items-center justify-between p-2 sm:p-4 select-none`;game.draw()};
+ btnSound.onclick=()=>audio.soundEnabled=!audio.soundEnabled;
+ btnBgm.onclick=()=>{
+     const on=audio.toggleBgm();
+     btnBgm.innerHTML=on
+       ? '<i class="fa-solid fa-music text-purple-500"></i><span class="hidden md:inline text-xs font-semibold">BGM ON</span>'
+       : '<i class="fa-solid fa-music text-gray-400"></i><span class="hidden md:inline text-xs font-semibold">BGM OFF</span>';
+ };
+ btnHelp.onclick=()=>helpModal.classList.remove('hidden');
+ btnCloseHelp.onclick=btnConfirmHelp.onclick=()=>helpModal.classList.add('hidden');
+
+ const bind=(id,fn,repeat=false)=>{const el=document.getElementById(id);let iv=null;const start=e=>{e.preventDefault();fn();if(repeat)iv=setInterval(fn,120)};const stop=()=>{clearInterval(iv);iv=null};el.addEventListener('touchstart',start,{passive:false});el.addEventListener('touchend',stop);el.addEventListener('mousedown',start);el.addEventListener('mouseup',stop);el.addEventListener('mouseleave',stop)};
+ bind('touchLeft',()=>game.move(-1),true);bind('touchRight',()=>game.move(1),true);bind('touchSoftDrop',()=>game.softDrop(),true);
+ bind('touchRotate',()=>game.rotate());bind('touchHardDrop',()=>game.hardDrop());bind('touchHold',()=>game.hold());
+
+ document.addEventListener('keydown',e=>{if(e.key==='ArrowLeft')game.move(-1);if(e.key==='ArrowRight')game.move(1);if(e.key==='ArrowDown')game.softDrop();if(['ArrowUp','z','Z','x','X'].includes(e.key))game.rotate();if(e.key===' '){e.preventDefault();game.hardDrop()}if(['c','C'].includes(e.key))game.hold()});
+};
+</script>
+</body>
+</html>
